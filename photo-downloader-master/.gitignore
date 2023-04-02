@@ -1,0 +1,7 @@
+.idea
+env
+venv
+downloads*
+to_download.txt
+output.log
+.DS_Store
