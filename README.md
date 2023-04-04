@@ -1,6 +1,5 @@
 # Gabes Scraper
 
-### Getting Started
 
 
 

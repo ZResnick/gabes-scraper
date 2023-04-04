@@ -29,6 +29,7 @@ logging.basicConfig(filename=LOG_NAME, level=logging.INFO,
                 '%(funcName)s(): '
                 '%(lineno)d:\t'
                 '%(message)s'))
+login_page = "https://secure.smugmug.com/login"
 
 def retrieve(root_url, password, username=None, headless=False):
     """
@@ -36,15 +37,21 @@ def retrieve(root_url, password, username=None, headless=False):
     """
     logging.info(f"retrieve {root_url}")
     global to_download
+    global login_page
 
     # init & auth
     chrome_options = Options()
     if headless:
         chrome_options.add_argument("--headless")
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
-    driver.get(root_url)
+    
+    # authenticate before navigating to gallery
+    driver.get(login_page)
     authenticate(driver, password, username=username)
-    time.sleep(1)
+    
+    time.sleep(2)
+    driver.get(root_url)
+    time.sleep(2)
     to_download = []
     get_all_urls_and_save_alt(driver, root_url, [], to_download)
 
@@ -96,7 +103,8 @@ def make_dir_and_download(link_url):
                         os.makedirs(new_directory)
 
                     # Download file and save it
-                    resp = requests.get(link_url, stream=True)
+                    resp = requests.get(link_url, stream=True) #this is returning a 404
+                    # logging.info(resp.reason)
                     if resp.status_code == 200:
                         with open(new_directory + new_file, 'wb') as f:
                             shutil.copyfileobj(resp.raw, f)
@@ -118,16 +126,16 @@ def authenticate(driver, password, username=None):
     try:
         if username is not None:
             if (type(username) == type([]) and username[0] is not None) or type(username) != type([]):
-                    username_area = driver.find_element_by_name("username")
+                    username_area = driver.find_element("name", "username")
                     username_area.clear()
                     username_area.send_keys(username)
-        password_area = driver.find_element_by_name("password")
+        password_area = driver.find_element("name", "password")
         password_area.clear()
         password_area.send_keys(password)
         password_area.send_keys(Keys.RETURN)
         time.sleep(5)
-    except:
-        logging.info(f"did not locate auth page, skipping")
+    except Exception as e:
+        logging.error(f"Encountered exception while authorizing: {e}")
 
 
 def get_all_urls_and_save_alt(driver, root_url, visited, to_download, second_chance=False):
@@ -155,12 +163,14 @@ def get_all_urls_and_save_alt(driver, root_url, visited, to_download, second_cha
     count = 0
     while len(tiles) == 0 and count < 3:
         # Check for gallery page
-        tiles = driver.find_elements_by_xpath('//li[contains(@class,"album")]')
+        tiles = driver.find_elements("xpath", '//li[contains(@class,"sm-tile-album")]')
+        logging.info(f"LENGTH OF TILES ALMBUM: {len(tiles)}")
         if len(tiles) > 0:
             page_type = "gallery"
             break
         # Check for image page
-        tiles = driver.find_elements_by_xpath("//li[contains(@class,'tile-photo')]")
+        tiles = driver.find_elements("xpath", "//li[contains(@class,'tile-photo')]")
+        logging.info(f"LENGTH OF TILES PHOTO: {len(tiles)}")
         if len(tiles) > 0:
             page_type = "images"
             break
@@ -183,7 +193,8 @@ def get_all_urls_and_save_alt(driver, root_url, visited, to_download, second_cha
         logging.info("Identified a gallery")
         for t in tiles:
             if t is not None:
-                link_url = t.find_element_by_tag_name('a').get_attribute('href')
+                link_url = driver.find_element("css selector", f"#{t.get_attribute('id')} a").get_attribute('href')
+                logging.info(link_url)
                 if link_url is not None and link_url not in visited:
                     to_visit.append(link_url)
 
@@ -192,11 +203,11 @@ def get_all_urls_and_save_alt(driver, root_url, visited, to_download, second_cha
         logging.info(f"Identified a list of images, tiles len {len(tiles)}")
         for t in tiles:
             if t is not None:
-                img_url = t.find_element_by_tag_name('img').get_attribute('src')
+                img_url = t.find_element("tag name", 'img').get_attribute('src')
                 if img_url not in downloaded:
                     downloaded.add(img_url)
                     make_dir_and_download(generate_original_url_from_link(img_url))
-        right_button = driver.find_elements_by_xpath('//a[contains(@class,"nav-right")]')
+        right_button = driver.find_elements("xpath", '//a[contains(@class,"nav-right")]')
         if len(right_button) > 0:
             next_img_link = right_button[0].get_attribute("href")
             logging.info(f"Found right button, trying to retrieve URL (len={len(right_button)}) with href ({next_img_link})")
@@ -233,7 +244,7 @@ def run():
         email = None if 'email' not in request_json.keys() else request_json['email']
         password = request_json['password']
         root_url = request_json['root_url']
-        retrieve(root_url, password, email, headless=True)
+        retrieve(root_url, password, email, headless=False)
 
         # Reset
         current_task = 'idle'
@@ -276,7 +287,7 @@ if __name__ == "__main__":
     driver.get(url)
     authenticate(driver, pw, user)
     time.sleep(5)
-    tiles = driver.find_elements_by_xpath('//*[@class="sm-tiles-list"]')
+    tiles = driver.find_elements("xpath", '//*[@class="sm-tiles-list"]')
     tiles = tiles[0].find_elements_by_tag_name("li")
     print(len(tiles))
 
