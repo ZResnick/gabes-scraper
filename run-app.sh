@@ -5,12 +5,10 @@ if [[ -n flask_app_pid ]]; then
 	kill -9 $flask_app_pid;
 fi;
 
-cd /photo-downloader-master/
-python3 -m venv venv
-. venv/bin/activate
+cd ~/Desktop/photo-downloader-master/
 source venv/bin/activate
 pip3 install -r requirements.txt
-flask run --debug -p5111 &
-cd ../photo-downloader-frontend-master/
+flask run &
+cd ~/Desktop/photo-downloader-frontend-master/
 npm install
 npm start
