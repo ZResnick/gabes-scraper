@@ -75,7 +75,7 @@ def generate_original_url_from_link(l):
     return l
 
 
-def make_dir_and_download(link_url):
+def make_dir_and_download(link_url, driver):
     """
     Create directory structure necessary for saving the photo and then
     proceed with the download
@@ -102,9 +102,16 @@ def make_dir_and_download(link_url):
                     if not os.path.exists(new_directory):
                         os.makedirs(new_directory)
 
+                    # Navigate to smugmugs source
+                    driver.get(link_url)
+
+                    # get the actual source thats not behind an auth wall
+                    photo = driver.find_element("css selector", "img")
+                    jpgUrl = photo.get_attribute("src")
+
                     # Download file and save it
-                    resp = requests.get(link_url, stream=True) #this is returning a 404
-                    # logging.info(resp.reason)
+                    resp = requests.get(jpgUrl, stream=True)
+
                     if resp.status_code == 200:
                         with open(new_directory + new_file, 'wb') as f:
                             shutil.copyfileobj(resp.raw, f)
@@ -113,6 +120,7 @@ def make_dir_and_download(link_url):
                         raise Exception("Non-200 response on ", link_url)
 
                     log_progress = log_progress[-9:] + [link_url]
+                    driver.back()
                     time.sleep(0.1)  # Don't ddos
                     return
             raise Exception("Unable to determine appropriate filename for link ", link_url)
@@ -200,13 +208,22 @@ def get_all_urls_and_save_alt(driver, root_url, visited, to_download, second_cha
 
     # images mode - look for all images to download
     elif page_type == "images":
+        # Gather img-url's before downloading
+        # Otherwise we lose refernce to t
+        img_urls = []
         logging.info(f"Identified a list of images, tiles len {len(tiles)}")
         for t in tiles:
             if t is not None:
                 img_url = t.find_element("tag name", 'img').get_attribute('src')
-                if img_url not in downloaded:
-                    downloaded.add(img_url)
-                    make_dir_and_download(generate_original_url_from_link(img_url))
+                img_urls.append(img_url)
+
+        # Once all img_urls are found, then go to each and download
+        for img_url in img_urls:
+            if img_url not in downloaded:
+                downloaded.add(img_url)
+                make_dir_and_download(generate_original_url_from_link(img_url), driver)
+                    
+        # check to see if theres paginated items
         right_button = driver.find_elements("xpath", '//a[contains(@class,"nav-right")]')
         if len(right_button) > 0:
             next_img_link = right_button[0].get_attribute("href")
@@ -244,7 +261,7 @@ def run():
         email = None if 'email' not in request_json.keys() else request_json['email']
         password = request_json['password']
         root_url = request_json['root_url']
-        retrieve(root_url, password, email, headless=False)
+        retrieve(root_url, password, email, headless=True) 
 
         # Reset
         current_task = 'idle'
