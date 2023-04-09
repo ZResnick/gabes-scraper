@@ -5,6 +5,7 @@ if [[ -n flask_app_pid ]]; then
 	kill -9 $flask_app_pid;
 fi;
 
+
 cd ~/Desktop/SmugMugScraper/photo-downloader-master/
 python3 -m venv venv
 . venv/bin/activate

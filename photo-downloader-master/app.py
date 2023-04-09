@@ -14,6 +14,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
 
+
 # Global vars
 start_time = None
 current_task = 'idle'
