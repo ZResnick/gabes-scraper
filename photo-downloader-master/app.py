@@ -83,7 +83,6 @@ def make_dir_and_download(link_url, driver):
     """
     global start_time
     global log_progress
-
     logging.info(f"make_dir_and_download {link_url}")
 
     dir_structure = link_url.split('/')
